@@ -24,7 +24,7 @@ resolvers += Resolver.url("fcomb", url("https://dl.bintray.com/fcomb/maven"))(Re
 ### Add dependencies to your `build.sbt`
 
 ```scala
-libraryDependencies += "io.fcomb" %% "db-migration" % "0.2.0"
+libraryDependencies += "io.fcomb" %% "db-migration" % "0.2.1"
 ```
 
 ## Usage
