@@ -7,8 +7,11 @@ Tested on PostgreSQL 9.4.
 
 ## TODO
 
-* Locks
 * Tests
+* sbt plugin
+* Rollbacks
+* Diff
+* Truncate
 
 ## Add to project
 
@@ -21,7 +24,7 @@ resolvers += Resolver.url("fcomb", url("https://dl.bintray.com/fcomb/maven"))(Re
 ### Add dependencies to your `build.sbt`
 
 ```scala
-libraryDependencies += "io.fcomb" %% "db-migration" % "0.1.0"
+libraryDependencies += "io.fcomb" %% "db-migration" % "0.2.0"
 ```
 
 ## Usage
