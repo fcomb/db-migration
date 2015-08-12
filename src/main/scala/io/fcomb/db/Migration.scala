@@ -16,7 +16,7 @@ import scala.io.Source
 object Migration {
   private val logger = LoggerFactory.getLogger(this.getClass)
 
-  private val migrationsTableSql = """
+  private val migrationSchemaSql = """
     CREATE TABLE IF NOT EXISTS migrations (
       version integer,
       name varchar(255) NOT NULL,
@@ -63,7 +63,12 @@ object Migration {
     options:   MigrationOptions
   )
 
-  def run(url: String, user: String, password: String)(implicit ec: ExecutionContext) =
+  def run(
+    url:            String,
+    user:           String,
+    password:       String,
+    migrationsPath: String = defaultMigrationsPath
+  )(implicit ec: ExecutionContext) =
     Future {
       blocking {
         val props = new Properties()
@@ -71,7 +76,7 @@ object Migration {
         props.setProperty("password", password)
         val connection = DriverManager.getConnection(url, props)
         try {
-          connection.prepareCall(migrationsTableSql).executeUpdate()
+          connection.prepareCall(migrationSchemaSql).executeUpdate()
 
           val rs = connection
             .prepareCall("SELECT * FROM migrations")
@@ -91,7 +96,7 @@ object Migration {
           }
           val persistVersionMap = persistMigrations.map(m => (m.version, m)).toMap
 
-          getMigrations.foreach { m =>
+          getMigrations(migrationsPath).foreach { m =>
             persistVersionMap.get(m.version) match {
               case Some(pm) => require(
                 pm.sha1 == m.sha1,
@@ -134,9 +139,9 @@ object Migration {
   private def getKlassLoader() =
     Option(Thread.currentThread).getOrElse(this).getClass.getClassLoader
 
-  private val migrationsPath = "sql/migrations"
+  private val defaultMigrationsPath = "sql/migrations"
 
-  private def getMigrationFiles() = {
+  private def getMigrationFiles(migrationsPath: String) = {
     val migrationFormat = "(\\A|\\/)V(\\d+)\\_{2}(\\w+)\\.sql\\z".r
     val files = Option(getKlassLoader.getResource(migrationsPath)).map { url =>
       url.getProtocol match {
@@ -158,9 +163,9 @@ object Migration {
       .sortBy(_._1)
   }
 
-  private def getMigrations() = {
+  private def getMigrations(migrationsPath: String) = {
     val crypt = MessageDigest.getInstance("SHA-1")
-    getMigrationFiles.map {
+    getMigrationFiles(migrationsPath).map {
       case (version, name) =>
         val migrationName = s"V${version}__$name"
         val rawMigration = Source
