@@ -171,18 +171,20 @@ class Migration(
 
   private def getMigrationFiles() = {
     val migrationFormat = "(\\A|\\/)V(\\d+)\\_{2}(\\w+)\\.sql\\z".r
-    val files = Option(getKlassLoader.getResource(migrationsPath)).map { url =>
-      url.getProtocol match {
-        case "file" => new File(url.toURI).listFiles.map(_.getName).toList
-        case "jar" =>
-          val jarPath = url.getPath.drop(5).takeWhile(_ != '!')
-          val jarFile = new JarFile(URLDecoder.decode(jarPath, "UTF-8"))
-          jarFile.entries
-            .map(_.getName)
-            .filter(_.startsWith(migrationsPath))
-            .toList
-      }
-    }.getOrElse(List.empty)
+    val files = Option(getKlassLoader.getResources(migrationsPath))
+      .map(_.toList.flatMap { url =>
+        url.getProtocol match {
+          case "file" => new File(url.toURI).listFiles.map(_.getName).toList
+          case "jar" =>
+            val jarPath = url.getPath.drop(5).takeWhile(_ != '!')
+            val jarFile = new JarFile(URLDecoder.decode(jarPath, "UTF-8"))
+            jarFile.entries
+              .map(_.getName)
+              .filter(_.startsWith(migrationsPath))
+              .toList
+        }
+      })
+      .getOrElse(List.empty)
     files
       .map(migrationFormat.findFirstMatchIn)
       .collect {
