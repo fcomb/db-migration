@@ -3,7 +3,14 @@
 [![Build Status](https://travis-ci.org/fcomb/db-migration.svg?branch=develop)](https://travis-ci.org/fcomb/db-migration)
 [![License](https://img.shields.io/:license-MIT-green.svg)](http://opensource.org/licenses/MIT)
 
-Tested on PostgreSQL 9.4.
+Extremely fast lightweight plain sql migration tool without pain.
+_Tested on PostgreSQL 9.4._
+
+## Features
+
+* Plain sql migrations support
+* Extremely fast
+* Locks
 
 ## TODO
 
