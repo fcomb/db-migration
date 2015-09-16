@@ -25,7 +25,7 @@ _Tested on PostgreSQL 9.4._
 ### Add resolvers to your `build.sbt`
 
 ```scala
-resolvers += Resolver.url("fcomb", url("https://dl.bintray.com/fcomb/maven"))(Resolver.ivyStylePatterns)
+resolvers += Resolver.bintrayRepo("fcomb", "maven")
 ```
 
 ### Add dependencies to your `build.sbt`
