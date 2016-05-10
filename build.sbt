@@ -2,7 +2,7 @@ name := "db-migration"
 
 organization := "io.fcomb"
 
-version := "0.3.0"
+version := "0.3.1"
 
 crossScalaVersions := Seq("2.11.8", "2.10.5")
 

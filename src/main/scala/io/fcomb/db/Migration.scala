@@ -91,7 +91,7 @@ class Migration(
           val persistMigrations = new ListBuffer[MigrationItem]()
           while (rs.next) {
             persistMigrations += MigrationItem(
-              version = rs.getInt("version"),
+              version = BigInt(rs.getBigDecimal("version").toBigInteger),
               name = rs.getString("name"),
               body = rs.getString("body"),
               sha1 = rs.getString("sha1"),
