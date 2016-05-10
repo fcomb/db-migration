@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/:license-MIT-green.svg)](http://opensource.org/licenses/MIT)
 
 Extremely fast lightweight plain sql migration tool without pain.
-_Tested on PostgreSQL 9.4._
+_Tested on PostgreSQL 9.5._
 
 ## Features
 
@@ -31,7 +31,7 @@ resolvers += Resolver.bintrayRepo("fcomb", "maven")
 ### Add dependencies to your `build.sbt`
 
 ```scala
-libraryDependencies += "io.fcomb" %% "db-migration" % "0.2.2"
+libraryDependencies += "io.fcomb" %% "db-migration" % "0.3.0"
 ```
 
 ## Usage
