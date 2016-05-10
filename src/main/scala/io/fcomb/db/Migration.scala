@@ -40,7 +40,7 @@ object MigrationItemOptions {
 }
 
 case class MigrationItem(
-  version:   Int,
+  version:   BigInt,
   name:      String,
   body:      String,
   sha1:      String,
@@ -58,7 +58,7 @@ class Migration(
 
   private val migrationSchemaSql = """
     CREATE TABLE IF NOT EXISTS migrations (
-      version integer,
+      version bigint,
       name varchar(255) NOT NULL,
       body text NOT NULL,
       sha1 char(40) NOT NULL,
@@ -121,7 +121,7 @@ class Migration(
                     INSERT INTO migrations (version, name, body, sha1, applied_at, options)
                     VALUES (?, ?, ?, ?, now(), ?)
                     """)
-                  mStmt.setInt(1, m.version)
+                  mStmt.setBigDecimal(1, BigDecimal(m.version).bigDecimal)
                   mStmt.setString(2, m.name)
                   mStmt.setString(3, m.body)
                   mStmt.setString(4, m.sha1)
@@ -188,7 +188,7 @@ class Migration(
     files
       .map(migrationFormat.findFirstMatchIn)
       .collect {
-        case Some(m) => (m.group(2).toInt, m.group(3))
+        case Some(m) => (BigInt(m.group(2)), m.group(3))
       }
       .sortBy(_._1)
   }

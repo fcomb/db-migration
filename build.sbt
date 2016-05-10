@@ -2,9 +2,9 @@ name := "db-migration"
 
 organization := "io.fcomb"
 
-version := "0.2.2"
+version := "0.3.0"
 
-crossScalaVersions := Seq("2.11.7", "2.10.5")
+crossScalaVersions := Seq("2.11.8", "2.10.5")
 
 libraryDependencies ++= Seq(
   "org.slf4j"      %  "slf4j-api"   % "1.7.12",
