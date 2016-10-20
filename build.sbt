@@ -2,13 +2,15 @@ name := "db-migration"
 
 organization := "io.fcomb"
 
-version := "0.3.1"
+version := "0.3.3-RC1"
 
-crossScalaVersions := Seq("2.11.8", "2.10.5")
+scalaVersion in ThisBuild := "2.11.8"
+
+crossScalaVersions := Seq("2.12.0-RC2", "2.11.8")
 
 libraryDependencies ++= Seq(
-  "org.slf4j"      %  "slf4j-api"   % "1.7.12",
-  "org.specs2"     %% "specs2-core" % "3.6.4" % "test"
+  "org.slf4j"      %  "slf4j-api"   % "1.7.21",
+  "org.specs2"     %% "specs2-core" % "3.8.5.1" % "test"
 )
 
 bintrayOrganization := Some("fcomb")
