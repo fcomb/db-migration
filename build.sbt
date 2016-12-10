@@ -2,7 +2,7 @@ name := "db-migration"
 
 organization := "io.fcomb"
 
-version := "0.3.4.1"
+version := "0.3.5"
 
 scalaVersion in ThisBuild := "2.12.1"
 
@@ -12,12 +12,11 @@ libraryDependencies ++= Seq(
   "org.slf4j" % "slf4j-api" % "1.7.21"
 )
 
-reformatOnCompileSettings
+// reformatOnCompileSettings
 
 bintrayOrganization := Some("fcomb")
 
-licenses := Seq(
-  "MIT" -> url("http://www.opensource.org/licenses/mit-license.html"))
+licenses := Seq("MIT" -> url("http://www.opensource.org/licenses/mit-license.html"))
 
 publishMavenStyle := true
 

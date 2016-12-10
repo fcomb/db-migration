@@ -10,15 +10,14 @@ import java.util.jar._
 import org.slf4j.LoggerFactory
 import scala.collection.JavaConversions._
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{blocking, ExecutionContext, Future}
 import scala.io.Source
 
 case class MigrationItemOptions(
     runInTransaction: Boolean = true
 ) {
   def serialize() =
-    Map("runInTransaction" -> runInTransaction).map { case (k, v) => s"$k:$v" }
-      .mkString(";")
+    Map("runInTransaction" -> runInTransaction).map { case (k, v) => s"$k:$v" }.mkString(";")
 }
 
 object MigrationItemOptions {
@@ -32,7 +31,7 @@ object MigrationItemOptions {
       .toMap
     val runInTransaction = optsMap.get("runInTransaction") match {
       case Some("false") => false
-      case _ => true
+      case _             => true
     }
     MigrationItemOptions(
       runInTransaction = runInTransaction
@@ -79,16 +78,14 @@ class Migration(
   def run()(implicit ec: ExecutionContext) =
     Future {
       blocking {
-        val connection = getConnection()
+        val connection     = getConnection()
         val lockConnection = getConnection()
         try {
           lockConnection.prepareCall(migrationSchemaSql).executeUpdate()
           lockConnection.setAutoCommit(false)
           logger.info("Locking migrations table")
-          val rs = lockConnection
-            .prepareCall("SELECT * FROM migrations FOR UPDATE")
-            .executeQuery()
-          val count = rs.getMetaData().getColumnCount()
+          val rs                = lockConnection.prepareCall("SELECT * FROM migrations FOR UPDATE").executeQuery()
+          val count             = rs.getMetaData().getColumnCount()
           val persistMigrations = new ListBuffer[MigrationItem]()
           while (rs.next) {
             persistMigrations += MigrationItem(
@@ -97,8 +94,7 @@ class Migration(
               body = rs.getString("body"),
               sha1 = rs.getString("sha1"),
               appliedAt = rs.getTimestamp("applied_at").toLocalDateTime(),
-              options =
-                MigrationItemOptions.deserialize(rs.getString("options"))
+              options = MigrationItemOptions.deserialize(rs.getString("options"))
             )
           }
           val persistVersionMap =
@@ -114,8 +110,7 @@ class Migration(
                 )
               case None =>
                 try {
-                  logger.info(
-                    s"Applying the migration ${m.version}#${m.name}: ${m.body}")
+                  logger.info(s"Applying the migration ${m.version}#${m.name}: ${m.body}")
 
                   connection.setAutoCommit(!m.options.runInTransaction)
                   val bodyStmt = connection.prepareStatement(m.body)
@@ -138,8 +133,7 @@ class Migration(
                 } catch {
                   case e: SQLException =>
                     if (m.options.runInTransaction) connection.rollback()
-                    logger.error(
-                      s"Problem migration ${m.version}#${m.name}: ${m.body}")
+                    logger.error(s"Problem migration ${m.version}#${m.name}: ${m.body}")
                     throw e
                 }
             }
@@ -156,7 +150,7 @@ class Migration(
       }
     }
 
-  def clean(schema: String = "public")(implicit ec: ExecutionContext) = {
+  def clean(schema: String = "public")(implicit ec: ExecutionContext) =
     Future {
       blocking {
         val connection = getConnection()
@@ -174,24 +168,20 @@ class Migration(
         }
       }
     }
-  }
 
-  private def getKlassLoader() =
+  private def klassLoader =
     Option(Thread.currentThread).getOrElse(this).getClass.getClassLoader
 
   private def getMigrationFiles() = {
     val migrationFormat = "(\\A|\\/)V(\\d+)\\_{2}(\\w+)\\.sql\\z".r
-    val files = Option(getKlassLoader.getResources(migrationsPath))
+    val files = Option(klassLoader.getResources(migrationsPath))
       .map(_.toList.flatMap { url =>
         url.getProtocol match {
           case "file" => new File(url.toURI).listFiles.map(_.getName).toList
           case "jar" =>
             val jarPath = url.getPath.drop(5).takeWhile(_ != '!')
             val jarFile = new JarFile(URLDecoder.decode(jarPath, "UTF-8"))
-            jarFile.entries
-              .map(_.getName)
-              .filter(_.startsWith(migrationsPath))
-              .toList
+            jarFile.entries.map(_.getName).filter(_.startsWith(migrationsPath)).toList
         }
       })
       .getOrElse(List.empty)
@@ -208,11 +198,8 @@ class Migration(
     getMigrationFiles().map {
       case (version, name) =>
         val migrationName = s"V${version}__$name"
-        val rawMigration = Source
-          .fromURL(
-            getKlassLoader.getResource(s"$migrationsPath/$migrationName.sql"))
-          .getLines
-          .toList
+        val stream        = klassLoader.getResourceAsStream(s"$migrationsPath/$migrationName.sql")
+        val rawMigration  = Source.fromInputStream(stream)("UTF-8").getLines.toList
         val options = rawMigration.headOption match {
           case Some(s) if s.startsWith("--") =>
             val args = s.dropWhile(_ == '-').split("\\s+").map(_.trim)
@@ -220,7 +207,7 @@ class Migration(
               o match {
                 case _ if o.startsWith("runInTransaction") =>
                   val v = o.split(':').last.toLowerCase match {
-                    case "true" => true
+                    case "true"  => true
                     case "false" => false
                   }
                   options.copy(runInTransaction = v)

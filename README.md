@@ -31,7 +31,7 @@ resolvers += Resolver.bintrayRepo("fcomb", "maven")
 ### Add dependencies to your `build.sbt`
 
 ```scala
-libraryDependencies += "io.fcomb" %% "db-migration" % "0.3.4.1"
+libraryDependencies += "io.fcomb" %% "db-migration" % "0.3.5"
 ```
 
 ## Usage
