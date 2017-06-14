@@ -8,7 +8,7 @@ import java.time.LocalDateTime
 import java.util.Properties
 import java.util.jar._
 import org.slf4j.LoggerFactory
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.{blocking, ExecutionContext, Future}
 import scala.io.Source
@@ -52,12 +52,13 @@ class Migration(
     url: String,
     user: String,
     password: String,
-    migrationsPath: String = Migration.defaultMigrationsPath
+    migrationsPath: String,
+    schema: String
 ) {
   private val logger = LoggerFactory.getLogger(this.getClass)
 
-  private val migrationSchemaSql = """
-    CREATE TABLE IF NOT EXISTS migrations (
+  private val migrationSchemaSql = s"""
+    CREATE TABLE IF NOT EXISTS $schema.migrations (
       version bigint,
       name varchar(255) NOT NULL,
       body text NOT NULL,
@@ -76,31 +77,31 @@ class Migration(
   }
 
   def run()(implicit ec: ExecutionContext) =
-    Future {
-      blocking {
-        val connection     = getConnection()
-        val lockConnection = getConnection()
-        try {
-          lockConnection.prepareCall(migrationSchemaSql).executeUpdate()
-          lockConnection.setAutoCommit(false)
-          logger.info("Locking migrations table")
-          val rs                = lockConnection.prepareCall("SELECT * FROM migrations FOR UPDATE").executeQuery()
-          val count             = rs.getMetaData().getColumnCount()
-          val persistMigrations = new ListBuffer[MigrationItem]()
-          while (rs.next) {
-            persistMigrations += MigrationItem(
-              version = BigInt(rs.getBigDecimal("version").toBigInteger),
-              name = rs.getString("name"),
-              body = rs.getString("body"),
-              sha1 = rs.getString("sha1"),
-              appliedAt = rs.getTimestamp("applied_at").toLocalDateTime(),
-              options = MigrationItemOptions.deserialize(rs.getString("options"))
-            )
-          }
-          val persistVersionMap =
-            persistMigrations.map(m => (m.version, m)).toMap
+    Future(blocking {
+      val connection     = getConnection()
+      val lockConnection = getConnection()
+      lockConnection.setAutoCommit(false)
+      try {
+        lockConnection.prepareCall(migrationSchemaSql).executeUpdate()
+        logger.debug("Locking migrations table")
+        val rs =
+          lockConnection.prepareCall(s"SELECT * FROM $schema.migrations FOR UPDATE").executeQuery()
+        val persistMigrations = new ListBuffer[MigrationItem]()
+        while (rs.next) {
+          persistMigrations += MigrationItem(
+            version = BigInt(rs.getBigDecimal("version").toBigInteger),
+            name = rs.getString("name"),
+            body = rs.getString("body"),
+            sha1 = rs.getString("sha1"),
+            appliedAt = rs.getTimestamp("applied_at").toLocalDateTime(),
+            options = MigrationItemOptions.deserialize(rs.getString("options"))
+          )
+        }
+        val persistVersionMap =
+          persistMigrations.map(m => (m.version, m)).toMap
 
-          getMigrations.foreach { m =>
+        getMigrations.foreach {
+          m =>
             persistVersionMap.get(m.version) match {
               case Some(pm) =>
                 require(
@@ -110,7 +111,7 @@ class Migration(
                 )
               case None =>
                 try {
-                  logger.info(s"Applying the migration ${m.version}#${m.name}: ${m.body}")
+                  logger.debug(s"Applying the migration ${m.version}#${m.name}: ${m.body}")
 
                   connection.setAutoCommit(!m.options.runInTransaction)
                   val bodyStmt = connection.prepareStatement(m.body)
@@ -118,9 +119,8 @@ class Migration(
                   if (m.options.runInTransaction) connection.commit()
                   bodyStmt.close()
 
-                  val mStmt = lockConnection.prepareStatement(
-                    """
-                    INSERT INTO migrations (version, name, body, sha1, applied_at, options)
+                  val mStmt = lockConnection.prepareStatement(s"""
+                    INSERT INTO $schema.migrations (version, name, body, sha1, applied_at, options)
                     VALUES (?, ?, ?, ?, now(), ?)
                     """)
                   mStmt.setBigDecimal(1, BigDecimal(m.version).bigDecimal)
@@ -137,37 +137,33 @@ class Migration(
                     throw e
                 }
             }
-          }
-        } finally {
-          try {
-            lockConnection.commit()
-          } finally {
-            logger.info("Unlocking migrations table")
-            lockConnection.close()
-          }
-          connection.close()
         }
+      } finally {
+        try lockConnection.commit()
+        finally {
+          logger.debug("Unlocking migrations table")
+          lockConnection.close()
+        }
+        connection.close()
       }
-    }
+    })
 
   def clean(schema: String = "public")(implicit ec: ExecutionContext) =
-    Future {
-      blocking {
-        val connection = getConnection()
-        try {
-          connection
-            .prepareCall(
-              s"""
-            DROP SCHEMA $schema cascade;
-            CREATE SCHEMA $schema;
-            """
-            )
-            .executeUpdate()
-        } finally {
-          connection.close()
-        }
+    Future(blocking {
+      val connection = getConnection()
+      try {
+        connection
+          .prepareCall(
+            s"""
+               DROP SCHEMA $schema cascade;
+               CREATE SCHEMA $schema;
+               """
+          )
+          .executeUpdate()
+      } finally {
+        connection.close()
       }
-    }
+    })
 
   private def klassLoader =
     Option(Thread.currentThread).getOrElse(this).getClass.getClassLoader
@@ -175,13 +171,13 @@ class Migration(
   private def getMigrationFiles() = {
     val migrationFormat = "(\\A|\\/)V(\\d+)\\_{2}(\\w+)\\.sql\\z".r
     val files = Option(klassLoader.getResources(migrationsPath))
-      .map(_.toList.flatMap { url =>
+      .map(_.asScala.toList.flatMap { url =>
         url.getProtocol match {
           case "file" => new File(url.toURI).listFiles.map(_.getName).toList
           case "jar" =>
             val jarPath = url.getPath.drop(5).takeWhile(_ != '!')
             val jarFile = new JarFile(URLDecoder.decode(jarPath, "UTF-8"))
-            jarFile.entries.map(_.getName).filter(_.startsWith(migrationsPath)).toList
+            jarFile.entries.asScala.map(_.getName).filter(_.startsWith(migrationsPath)).toList
         }
       })
       .getOrElse(List.empty)
@@ -249,14 +245,20 @@ object Migration {
       url: String,
       user: String,
       password: String,
-      migrationsPath: String = Migration.defaultMigrationsPath
+      migrationsPath: String = Migration.defaultMigrationsPath,
+      schema: String = "public"
   )(implicit ec: ExecutionContext) =
-    new Migration(url, user, password, migrationsPath).run()
+    new Migration(url, user, password, migrationsPath, schema).run()
 
   def clean(
       url: String,
       user: String,
-      password: String
+      password: String,
+      schema: String = "public"
   )(implicit ec: ExecutionContext) =
-    new Migration(url, user, password).clean()
+    new Migration(url,
+                  user,
+                  password,
+                  migrationsPath = Migration.defaultMigrationsPath,
+                  schema = schema).clean()
 }

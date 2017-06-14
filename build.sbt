@@ -2,11 +2,11 @@ name := "db-migration"
 
 organization := "io.fcomb"
 
-version := "0.3.5"
+version := "0.4.1"
 
-scalaVersion in ThisBuild := "2.12.1"
+scalaVersion in ThisBuild := "2.12.2"
 
-crossScalaVersions := Seq("2.11.8", "2.12.1")
+crossScalaVersions := Seq("2.11.11", "2.12.2")
 
 libraryDependencies ++= Seq(
   "org.slf4j" % "slf4j-api" % "1.7.21"
@@ -45,3 +45,27 @@ pomExtra := (<url>https://github.com/fcomb/db-migration</url>
       <url>https://github.com/fcomb/</url>
     </developer>
   </developers>)
+
+scalacOptions ++= Seq(
+  "-encoding",
+  "UTF-8",
+  "-target:jvm-1.8",
+  "-unchecked",
+  "-deprecation",
+  "-feature",
+  "-language:higherKinds",
+  "-language:existentials",
+  "-language:postfixOps",
+  "-Xexperimental",
+  "-Xlint",
+  "-Xfatal-warnings",
+  "-Xfuture",
+  "-Ydelambdafy:method",
+  "-Yno-adapted-args",
+  "-Ywarn-dead-code",
+  "-Ywarn-infer-any",
+  "-Ywarn-numeric-widen",
+  "-Ywarn-unused",
+  "-Ywarn-unused-import",
+  "-Ywarn-value-discard"
+)
