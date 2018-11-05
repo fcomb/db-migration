@@ -13,7 +13,7 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.{blocking, ExecutionContext, Future}
 import scala.io.Source
 
-case class MigrationItemOptions(
+final case class MigrationItemOptions(
     runInTransaction: Boolean = true
 ) {
   def serialize() =
@@ -25,9 +25,7 @@ object MigrationItemOptions {
     val optsMap = s
       .split(';')
       .map(_.split(':').toList)
-      .collect {
-        case k :: v :: Nil => (k, v)
-      }
+      .collect { case k :: v :: Nil => (k, v) }
       .toMap
     val runInTransaction = optsMap.get("runInTransaction") match {
       case Some("false") => false
@@ -39,7 +37,7 @@ object MigrationItemOptions {
   }
 }
 
-case class MigrationItem(
+final case class MigrationItem(
     version: BigInt,
     name: String,
     body: String,
@@ -48,7 +46,7 @@ case class MigrationItem(
     options: MigrationItemOptions
 )
 
-class Migration(
+final class Migration(
     url: String,
     user: String,
     password: String,

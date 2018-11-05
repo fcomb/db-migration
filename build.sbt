@@ -2,19 +2,16 @@ name := "db-migration"
 
 organization := "io.fcomb"
 
-version := "0.4.1"
+version := "0.5.0"
 
-scalaVersion in ThisBuild := "2.12.2"
+scalaVersion in ThisBuild := "2.12.7"
 
-crossScalaVersions := Seq("2.11.11", "2.12.2")
+scalafmtOnCompile := true
 
-libraryDependencies ++= Seq(
-  "org.slf4j" % "slf4j-api" % "1.7.21"
-)
-
-// reformatOnCompileSettings
+libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.21" % "provided"
 
 bintrayOrganization := Some("fcomb")
+bintrayRepository := "maven"
 
 licenses := Seq("MIT" -> url("http://www.opensource.org/licenses/mit-license.html"))
 
@@ -47,25 +44,32 @@ pomExtra := (<url>https://github.com/fcomb/db-migration</url>
   </developers>)
 
 scalacOptions ++= Seq(
-  "-encoding",
-  "UTF-8",
-  "-target:jvm-1.8",
-  "-unchecked",
   "-deprecation",
+  "-encoding",
+  "utf-8",
+  "-explaintypes",
   "-feature",
-  "-language:higherKinds",
+  "-release",
+  "11",
   "-language:existentials",
-  "-language:postfixOps",
-  "-Xexperimental",
-  "-Xlint",
+  "-language:experimental.macros",
+  "-language:higherKinds",
+  "-language:implicitConversions",
+  "-unchecked",
+  "-Xcheckinit",
   "-Xfatal-warnings",
   "-Xfuture",
-  "-Ydelambdafy:method",
+  "-Xlint",
   "-Yno-adapted-args",
+  "-Ypartial-unification",
+  "-Yrangepos",
   "-Ywarn-dead-code",
+  "-Ywarn-extra-implicit",
+  "-Ywarn-inaccessible",
   "-Ywarn-infer-any",
+  "-Ywarn-nullary-override",
+  "-Ywarn-nullary-unit",
   "-Ywarn-numeric-widen",
-  "-Ywarn-unused",
-  "-Ywarn-unused-import",
+  "-Ywarn-unused:_",
   "-Ywarn-value-discard"
 )
