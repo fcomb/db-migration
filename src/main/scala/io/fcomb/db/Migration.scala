@@ -5,13 +5,13 @@ import java.net.URLDecoder
 import java.security.MessageDigest
 import java.sql.{DriverManager, SQLException}
 import java.time.LocalDateTime
-import java.util.Properties
 import java.util.jar._
+import java.util.Properties
 import org.slf4j.LoggerFactory
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.{blocking, ExecutionContext, Future}
 import scala.io.Source
+import scala.util.Try
 
 final case class MigrationItemOptions(
     runInTransaction: Boolean = true
@@ -74,101 +74,99 @@ final class Migration(
     DriverManager.getConnection(url, props)
   }
 
-  def run()(implicit ec: ExecutionContext) =
-    Future(blocking {
-      val connection     = getConnection()
-      val lockConnection = getConnection()
-      lockConnection.setAutoCommit(false)
-      try {
-        lockConnection.prepareCall(migrationSchemaSql).executeUpdate()
-        logger.debug("Locking migrations table")
-        val rs =
-          lockConnection.prepareCall(s"SELECT * FROM $schema.migrations FOR UPDATE").executeQuery()
-        val persistMigrations = new ListBuffer[MigrationItem]()
-        while (rs.next) {
-          persistMigrations += MigrationItem(
-            version = BigInt(rs.getBigDecimal("version").toBigInteger),
-            name = rs.getString("name"),
-            body = rs.getString("body"),
-            sha1 = rs.getString("sha1"),
-            appliedAt = rs.getTimestamp("applied_at").toLocalDateTime(),
-            options = MigrationItemOptions.deserialize(rs.getString("options"))
-          )
-        }
-        val persistVersionMap =
-          persistMigrations.map(m => (m.version, m)).toMap
+  def unsafeRun(): Unit = {
+    val connection     = getConnection()
+    val lockConnection = getConnection()
+    lockConnection.setAutoCommit(false)
+    try {
+      lockConnection.prepareCall(migrationSchemaSql).executeUpdate()
+      logger.debug("Locking migrations table")
+      val rs =
+        lockConnection.prepareCall(s"SELECT * FROM $schema.migrations FOR UPDATE").executeQuery()
+      val persistMigrations = new ListBuffer[MigrationItem]()
+      while (rs.next) {
+        persistMigrations += MigrationItem(
+          version = BigInt(rs.getBigDecimal("version").toBigInteger),
+          name = rs.getString("name"),
+          body = rs.getString("body"),
+          sha1 = rs.getString("sha1"),
+          appliedAt = rs.getTimestamp("applied_at").toLocalDateTime(),
+          options = MigrationItemOptions.deserialize(rs.getString("options"))
+        )
+      }
+      val persistVersionMap =
+        persistMigrations.map(m => (m.version, m)).toMap
 
-        getMigrations.foreach {
-          m =>
-            persistVersionMap.get(m.version) match {
-              case Some(pm) =>
-                require(
-                  pm.sha1 == m.sha1,
-                  s"Migration '${pm.version}' has changed ${pm.sha1} != ${m.sha1}!\nDiff: ${pm.body
-                    .diff(m.body)}"
-                )
-              case None =>
-                try {
-                  logger.debug(s"Applying the migration ${m.version}#${m.name}: ${m.body}")
+      getMigrations(getClassLoader).foreach { m =>
+        persistVersionMap.get(m.version) match {
+          case Some(pm) =>
+            require(
+              pm.sha1 == m.sha1,
+              s"Migration '${pm.version}' has changed ${pm.sha1} != ${m.sha1}!\nDiff: ${pm.body
+                .diff(m.body)}"
+            )
+          case None =>
+            try {
+              logger.debug(s"Applying the migration ${m.version}#${m.name}: ${m.body}")
 
-                  connection.setAutoCommit(!m.options.runInTransaction)
-                  val bodyStmt = connection.prepareStatement(m.body)
-                  bodyStmt.execute()
-                  if (m.options.runInTransaction) connection.commit()
-                  bodyStmt.close()
+              connection.setAutoCommit(!m.options.runInTransaction)
+              val bodyStmt = connection.prepareStatement(m.body)
+              bodyStmt.execute()
+              if (m.options.runInTransaction) connection.commit()
+              bodyStmt.close()
 
-                  val mStmt = lockConnection.prepareStatement(s"""
+              val mStmt = lockConnection.prepareStatement(s"""
                     INSERT INTO $schema.migrations (version, name, body, sha1, applied_at, options)
                     VALUES (?, ?, ?, ?, now(), ?)
                     """)
-                  mStmt.setBigDecimal(1, BigDecimal(m.version).bigDecimal)
-                  mStmt.setString(2, m.name)
-                  mStmt.setString(3, m.body)
-                  mStmt.setString(4, m.sha1)
-                  mStmt.setString(5, m.options.serialize)
-                  mStmt.executeUpdate()
-                  mStmt.close()
-                } catch {
-                  case e: SQLException =>
-                    if (m.options.runInTransaction) connection.rollback()
-                    logger.error(s"Problem migration ${m.version}#${m.name}: ${m.body}")
-                    throw e
-                }
+              mStmt.setBigDecimal(1, BigDecimal(m.version).bigDecimal)
+              mStmt.setString(2, m.name)
+              mStmt.setString(3, m.body)
+              mStmt.setString(4, m.sha1)
+              mStmt.setString(5, m.options.serialize)
+              mStmt.executeUpdate()
+              mStmt.close()
+            } catch {
+              case e: SQLException =>
+                if (m.options.runInTransaction) connection.rollback()
+                logger.error(s"Problem migration ${m.version}#${m.name}: ${m.body}")
+                throw e
             }
         }
-      } finally {
-        try lockConnection.commit()
-        finally {
-          logger.debug("Unlocking migrations table")
-          lockConnection.close()
-        }
-        connection.close()
       }
-    })
+    } finally {
+      try lockConnection.commit()
+      finally {
+        logger.debug("Unlocking migrations table")
+        lockConnection.close()
+      }
+      connection.close()
+    }
+  }
 
-  def clean(schema: String = "public")(implicit ec: ExecutionContext) =
-    Future(blocking {
-      val connection = getConnection()
-      try {
-        connection
-          .prepareCall(
-            s"""
+  def unsafeClean(schema: String = "public"): Unit = {
+    val connection = getConnection()
+    try {
+      connection
+        .prepareCall(
+          s"""
                DROP SCHEMA $schema cascade;
                CREATE SCHEMA $schema;
                """
-          )
-          .executeUpdate()
-      } finally {
-        connection.close()
-      }
-    })
+        )
+        .executeUpdate()
+    } finally connection.close()
+    ()
+  }
 
-  private def klassLoader =
-    Option(Thread.currentThread).getOrElse(this).getClass.getClassLoader
+  private def getClassLoader() =
+    Try(Thread.currentThread.getClass.getClassLoader).toOption
+      .flatMap(Option(_))
+      .getOrElse(this.getClass.getClassLoader)
 
-  private def getMigrationFiles() = {
+  private def getMigrationFiles(loader: ClassLoader) = {
     val migrationFormat = "(\\A|\\/)V(\\d+)\\_{2}(\\w+)\\.sql\\z".r
-    val files = Option(klassLoader.getResources(migrationsPath))
+    val files = Option(loader.getResources(migrationsPath))
       .map(_.asScala.toList.flatMap { url =>
         url.getProtocol match {
           case "file" => new File(url.toURI).listFiles.map(_.getName).toList
@@ -187,12 +185,12 @@ final class Migration(
       .sortBy(_._1)
   }
 
-  private def getMigrations() = {
+  private def getMigrations(loader: ClassLoader) = {
     val crypt = MessageDigest.getInstance("SHA-1")
-    getMigrationFiles().map {
+    getMigrationFiles(loader).map {
       case (version, name) =>
         val migrationName = s"V${version}__$name"
-        val stream        = klassLoader.getResourceAsStream(s"$migrationsPath/$migrationName.sql")
+        val stream        = loader.getResourceAsStream(s"$migrationsPath/$migrationName.sql")
         val rawMigration  = Source.fromInputStream(stream)("UTF-8").getLines.toList
         val options = rawMigration.headOption match {
           case Some(s) if s.startsWith("--") =>
@@ -215,7 +213,8 @@ final class Migration(
             _.replaceFirst("--.*", "")
               .replaceFirst("\\A(\\s|\\n)+", "")
               .replaceFirst("(\\s|\\n)+\\z", "")
-              .replaceAll("\\s{2,}", " "))
+              .replaceAll("\\s{2,}", " ")
+          )
           .filter(_.nonEmpty)
           .mkString(" ")
           .replaceAll("(?s)/\\*[^\\*]*\\*\\/", "")
@@ -239,24 +238,26 @@ final class Migration(
 object Migration {
   val defaultMigrationsPath = "sql/migrations"
 
-  def run(
+  def unsafeRun(
       url: String,
       user: String,
       password: String,
       migrationsPath: String = Migration.defaultMigrationsPath,
       schema: String = "public"
-  )(implicit ec: ExecutionContext) =
-    new Migration(url, user, password, migrationsPath, schema).run()
+  ): Unit =
+    new Migration(url, user, password, migrationsPath, schema).unsafeRun()
 
-  def clean(
+  def unsafeClean(
       url: String,
       user: String,
       password: String,
       schema: String = "public"
-  )(implicit ec: ExecutionContext) =
-    new Migration(url,
-                  user,
-                  password,
-                  migrationsPath = Migration.defaultMigrationsPath,
-                  schema = schema).clean()
+  ): Unit =
+    new Migration(
+      url,
+      user,
+      password,
+      migrationsPath = Migration.defaultMigrationsPath,
+      schema = schema
+    ).unsafeClean()
 }

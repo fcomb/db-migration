@@ -2,9 +2,9 @@ name := "db-migration"
 
 organization := "io.fcomb"
 
-version := "0.5.0"
+version := "0.6.2"
 
-scalaVersion in ThisBuild := "2.12.7"
+scalaVersion in ThisBuild := "2.12.8"
 
 scalafmtOnCompile := true
 
