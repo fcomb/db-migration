@@ -94,6 +94,7 @@ final class Migration(
           options = MigrationItemOptions.deserialize(rs.getString("options"))
         )
       }
+      lockConnection.setSavepoint()
       val persistVersionMap =
         persistMigrations.map(m => (m.version, m)).toMap
 
