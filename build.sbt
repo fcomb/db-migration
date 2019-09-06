@@ -2,9 +2,9 @@ name := "db-migration"
 
 organization := "io.fcomb"
 
-version := "0.6.2"
+version := "0.6.3"
 
-scalaVersion in ThisBuild := "2.12.8"
+scalaVersion in ThisBuild := "2.12.9"
 
 scalafmtOnCompile := true
 
@@ -49,10 +49,9 @@ scalacOptions ++= Seq(
   "utf-8",
   "-explaintypes",
   "-feature",
-  "-release",
-  "11",
+  // "-release",
+  // "11",
   "-language:existentials",
-  "-language:experimental.macros",
   "-language:higherKinds",
   "-language:implicitConversions",
   "-unchecked",
