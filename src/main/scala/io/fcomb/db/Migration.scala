@@ -103,7 +103,7 @@ final class Migration(
           case Some(pm) =>
             require(
               pm.sha1 == m.sha1,
-              s"Migration '${pm.version}' has changed ${pm.sha1} != ${m.sha1}!\nDiff: ${pm.body
+              s"Migration '${pm.version}' has changed ${pm.sha1} != ${m.sha1}!\nDiff: ${pm.body.toSeq
                 .diff(m.body)}"
             )
           case None =>

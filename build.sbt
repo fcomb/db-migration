@@ -1,10 +1,15 @@
+val scala212 = "2.12.10"
+val scala213 = "2.13.1"
+
 name := "db-migration"
 
 organization := "io.fcomb"
 
 version := "0.6.3"
 
-scalaVersion in ThisBuild := "2.12.9"
+scalaVersion in ThisBuild := scala213
+
+crossScalaVersions := Seq(scala212, scala213)
 
 scalafmtOnCompile := true
 
@@ -55,20 +60,10 @@ scalacOptions ++= Seq(
   "-language:higherKinds",
   "-language:implicitConversions",
   "-unchecked",
-  "-Xcheckinit",
-  "-Xfatal-warnings",
-  "-Xfuture",
   "-Xlint",
-  "-Yno-adapted-args",
-  "-Ypartial-unification",
   "-Yrangepos",
   "-Ywarn-dead-code",
   "-Ywarn-extra-implicit",
-  "-Ywarn-inaccessible",
-  "-Ywarn-infer-any",
-  "-Ywarn-nullary-override",
-  "-Ywarn-nullary-unit",
-  "-Ywarn-numeric-widen",
   "-Ywarn-unused:_",
   "-Ywarn-value-discard"
 )
